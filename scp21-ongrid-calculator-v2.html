@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SCP21 On-Grid — Power & ROI Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#f8f9fb;--surface:#ffffff;--surface2:#edf1f6;
+  --border:rgba(0,0,0,0.07);--border2:rgba(0,0,0,0.13);
+  --text:#141820;--muted:#6b7a94;
+  --accent:#0062cc;--accent2:#0084ff;
+  --solar:#e8a010;--green:#148a52;--red:#c82828;--orange:#c05c10;--purple:#5c30c8;
+  --grid-green:#12a862;
+  --mono:'DM Mono',monospace;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:#ffffff;color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(circle at 80% 10%, rgba(0,98,204,0.03) 0%, transparent 60%),linear-gradient(rgba(0,0,0,0.018) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,0.018) 1px,transparent 1px);background-size:100% 100%, 48px 48px, 48px 48px;pointer-events:none;z-index:0;}
+.app{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:32px 24px 80px;}
+
+/* HEADER */
+header{margin-bottom:28px;}
+.top-bar{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.logo-row{display:flex;align-items:center;gap:14px;margin-bottom:6px;}
+.logo-mark{width:42px;height:42px;background:var(--accent);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;line-height:1.2;text-align:center;}
+h1{font-size:27px;font-weight:800;letter-spacing:-0.03em;}
+h1 span{color:var(--accent);}
+.subtitle{color:var(--muted);font-size:11.5px;font-family:var(--mono);margin-top:3px;}
+.badges{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.badge{display:inline-flex;align-items:center;gap:5px;border-radius:20px;padding:4px 12px;font-size:11px;font-family:var(--mono);font-weight:600;}
+.badge.grid{background:rgba(18,168,98,0.1);border:1px solid rgba(18,168,98,0.3);color:var(--grid-green);}
+.badge.grid::before{content:'●';font-size:8px;animation:blink 2s infinite;}
+.badge.info{background:rgba(0,98,204,0.08);border:1px solid rgba(0,98,204,0.2);color:var(--accent);}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0.25;}}
+.currency-row{display:flex;gap:6px;align-items:center;}
+.cur-label{font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;}
+.cur-btn{font-family:var(--mono);font-size:12px;font-weight:600;padding:6px 14px;border-radius:6px;cursor:pointer;border:1px solid var(--border2);background:var(--surface);color:var(--muted);transition:all 0.15s;}
+.cur-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.pdf-btn{display:flex;align-items:center;gap:7px;background:var(--text);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-family:var(--mono);font-size:11px;font-weight:500;cursor:pointer;transition:all 0.15s;letter-spacing:0.04em;text-transform:uppercase;}
+.pdf-btn:hover{background:var(--accent);}
+
+/* SECTION HEADERS */
+.sec-header{display:flex;align-items:center;gap:10px;margin:28px 0 14px;}
+.sec-header .num{width:24px;height:24px;border-radius:6px;background:var(--accent);color:#fff;font-size:11px;font-weight:800;font-family:var(--mono);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.sec-header h2{font-size:15px;font-weight:700;letter-spacing:-0.01em;}
+.sec-header .sec-sub{font-size:11px;font-family:var(--mono);color:var(--muted);margin-left:4px;}
+
+/* PANELS */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px;}
+.panel:last-child{margin-bottom:0;}
+.panel-head{padding:10px 18px 9px;border-bottom:1px solid var(--border);font-size:10px;font-family:var(--mono);letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;}
+.panel-head .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.panel-body{padding:16px 18px;}
+
+/* ═══════════════════════════════════════
+   CARPORT ROW BUILDER  — light theme
+═══════════════════════════════════════ */
+.row-list{display:flex;flex-direction:column;gap:14px;}
+
+.cp-row{background:#f4f6fb;border:1px solid var(--border2);border-radius:12px;overflow:hidden;}
+.cp-row-header{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#e8edf7;border-bottom:1px solid var(--border2);flex-wrap:wrap;}
+.cp-row-label{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);background:rgba(0,98,204,0.1);border-radius:5px;padding:3px 10px;white-space:nowrap;}
+.cp-row-meta{font-family:var(--mono);font-size:11px;color:var(--muted);}
+.cp-row-add{display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap;}
+
+/* Extension CTA — very visible */
+.add-ext-label{font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;white-space:nowrap;}
+.add-ext-btn{font-family:var(--mono);font-size:12px;font-weight:700;padding:6px 16px;border-radius:7px;cursor:pointer;border:2px solid;transition:all 0.15s;display:inline-flex;align-items:center;gap:5px;}
+.add-ext-btn.scp21{background:var(--accent);color:#fff;border-color:var(--accent);}
+.add-ext-btn.scp21:hover{background:#004fa6;border-color:#004fa6;transform:translateY(-1px);box-shadow:0 3px 10px rgba(0,98,204,0.3);}
+.add-ext-btn.rem{background:transparent;color:var(--muted);border-color:var(--border2);font-size:11px;padding:5px 12px;}
+.add-ext-btn.rem:hover{background:rgba(200,40,40,0.08);color:var(--red);border-color:var(--red);}
+.del-row-btn{font-family:var(--mono);font-size:11px;padding:5px 12px;border-radius:6px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--muted);transition:all 0.15s;}
+.del-row-btn:hover{background:rgba(200,40,40,0.08);color:var(--red);border-color:var(--red);}
+
+/* Unit strip inside each row */
+.cp-row-units{display:flex;align-items:stretch;gap:0;padding:12px 12px 10px;overflow-x:auto;}
+.unit-block{position:relative;min-width:110px;flex-shrink:0;display:flex;flex-direction:column;}
+.unit-block+.unit-block{margin-left:6px;}
+.unit-tag{display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:4px 4px 0 0;font-family:var(--mono);font-size:10px;font-weight:700;}
+.unit-tag.full-tag{background:#0062cc;}
+.unit-tag.ext-tag{background:#5c30c8;}
+.unit-tag .tag-label{color:#fff;}
+.unit-tag .tag-cars{color:rgba(255,255,255,0.7);font-size:9px;}
+.unit-visual{background:rgba(255,255,255,0.7);border:1px solid var(--border2);border-radius:0 4px 4px 4px;padding:6px 4px;flex:1;}
+
+/* Top-view parking spots */
+.parking-strip{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;}
+.parking-spot{width:26px;height:36px;background:#e8edf7;border:1px solid var(--border2);border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:2px 0;position:relative;font-family:var(--mono);font-size:7px;color:var(--muted);}
+.parking-spot .car-icon{font-size:14px;line-height:1;}
+.parking-spot .spot-num{font-size:7px;color:var(--muted);opacity:0.6;}
+/* Solar panel roof overlay */
+.solar-roof{position:absolute;top:0;left:1px;right:1px;height:14px;background:repeating-linear-gradient(90deg,rgba(232,160,16,0.45) 0px,rgba(232,160,16,0.45) 7px,rgba(232,160,16,0.15) 7px,rgba(232,160,16,0.15) 8px);border-radius:2px 2px 0 0;border-bottom:1px solid rgba(232,160,16,0.5);}
+
+/* Ground screws */
+.unit-footer{display:flex;align-items:center;justify-content:space-between;padding:4px 2px 0;font-family:var(--mono);font-size:9px;color:var(--muted);}
+.screw-row{display:flex;gap:2px;align-items:center;}
+.screw{width:6px;height:6px;border-radius:50%;background:var(--border2);}
+
+/* Row footer stats */
+.cp-row-footer{padding:6px 14px 8px;font-family:var(--mono);font-size:10px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap;border-top:1px solid var(--border);}
+.cp-row-footer span{white-space:nowrap;}
+.cp-row-footer strong{color:var(--text);}
+
+/* Grand total ground screws badge */
+.screws-badge{display:inline-flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 14px;font-family:var(--mono);font-size:11px;color:var(--muted);}
+.screws-badge .screw-count{font-size:18px;font-weight:800;color:var(--text);}
+.screws-badge .screw-label{font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);}
+
+.add-carport-row-btn{display:flex;align-items:center;gap:8px;background:transparent;border:1px dashed rgba(0,98,204,0.4);border-radius:10px;padding:10px 18px;font-family:var(--mono);font-size:12px;color:var(--accent);cursor:pointer;transition:all 0.15s;width:100%;justify-content:center;margin-top:8px;}
+.add-carport-row-btn:hover{background:rgba(0,98,204,0.06);border-style:solid;}
+
+/* SLIDERS */
+.ctrl{margin-bottom:14px;}
+.ctrl:last-child{margin-bottom:0;}
+.ctrl-label{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
+.ctrl-name{font-size:11px;color:var(--muted);font-family:var(--mono);}
+.ctrl-val{font-size:15px;font-weight:700;font-family:var(--mono);}
+.ctrl-unit{font-size:10px;color:var(--muted);margin-left:2px;}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;background:var(--border2);border-radius:2px;cursor:pointer;outline:none;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:0 0 0 3px rgba(0,98,204,0.2);transition:box-shadow 0.15s;}
+input[type=range].solar::-webkit-slider-thumb{background:var(--solar);box-shadow:0 0 0 3px rgba(232,160,16,0.2);}
+input[type=range].green::-webkit-slider-thumb{background:var(--green);box-shadow:0 0 0 3px rgba(20,138,82,0.2);}
+.range-hints{display:flex;justify-content:space-between;margin-top:3px;}
+.range-hint{font-size:9px;font-family:var(--mono);color:var(--muted);opacity:0.6;}
+
+.editable-field{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:6px 10px;margin-top:4px;}
+.editable-field label{font-size:10px;font-family:var(--mono);color:var(--muted);white-space:nowrap;}
+.editable-field input[type=number]{background:transparent;border:none;outline:none;font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text);width:80px;text-align:right;}
+.editable-field .ef-unit{font-size:10px;font-family:var(--mono);color:var(--muted);}
+
+/* KPIs */
+.kpi-row{display:grid;gap:10px;margin-bottom:14px;}
+.kpi-row.cols-4{grid-template-columns:repeat(4,1fr);}
+.kpi-row.cols-3{grid-template-columns:repeat(3,1fr);}
+.kpi-row.cols-2{grid-template-columns:repeat(2,1fr);}
+@media(max-width:700px){.kpi-row.cols-4,.kpi-row.cols-3{grid-template-columns:1fr 1fr;}}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 13px;}
+.kpi.hl{background:var(--surface2);border-color:var(--border2);}
+.kpi.accent{border-color:rgba(0,98,204,0.25);background:rgba(0,98,204,0.04);}
+.kpi-label{font-size:9px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;}
+.kpi-val{font-size:22px;font-weight:700;line-height:1;margin-bottom:2px;font-family:var(--mono);}
+.kpi-val.blue{color:var(--accent);}.kpi-val.green{color:var(--green);}.kpi-val.solar{color:var(--solar);}.kpi-val.purple{color:var(--purple);}.kpi-val.red{color:var(--red);}
+.kpi-sub{font-size:9px;color:var(--muted);font-family:var(--mono);}
+.kpi-row.mb0{margin-bottom:0;}
+
+/* SUMMARY TABLE */
+.summary-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px;}
+.summary-table th{text-align:left;padding:8px 12px;font-size:10px;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border2);}
+.summary-table td{padding:9px 12px;border-bottom:1px solid var(--border);}
+.summary-table td:last-child,.summary-table th:last-child{text-align:right;}
+.summary-table tr.subtotal td{background:var(--surface2);font-weight:600;border-top:1px solid var(--border2);}
+.summary-table tr.total td{background:rgba(0,98,204,0.05);font-weight:800;font-size:14px;border-top:2px solid var(--accent);color:var(--accent);}
+.summary-table tr.discount td{color:var(--green);font-style:italic;}
+.row-type-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;}
+.row-type-badge.full{background:rgba(0,98,204,0.1);color:var(--accent);}
+.row-type-badge.ext{background:rgba(92,48,200,0.1);color:var(--purple);}
+
+/* DISCOUNT */
+.disc-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-family:var(--mono);font-weight:600;background:rgba(20,138,82,0.1);border:1px solid rgba(20,138,82,0.25);color:var(--green);}
+
+/* COST BAR */
+.cost-bar-wrap{margin-top:14px;}
+.cost-bar-title{font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;}
+.cost-bar-track{height:24px;background:var(--surface2);border-radius:6px;overflow:hidden;display:flex;}
+.cost-bar-track div{height:100%;transition:width 0.4s;display:flex;align-items:center;padding:0 6px;}
+.cost-bar-track div span{font-size:10px;font-family:var(--mono);font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;}
+.cost-legend{display:flex;gap:14px;margin-top:7px;flex-wrap:wrap;}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:10px;font-family:var(--mono);color:var(--muted);}
+.leg-dot{width:9px;height:9px;border-radius:2px;flex-shrink:0;}
+
+/* EV */
+.ev-charger-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:600px){.ev-charger-grid{grid-template-columns:1fr;}}
+.qty-ctrl{display:flex;align-items:center;border:1px solid var(--border2);border-radius:6px;overflow:hidden;width:fit-content;}
+.qty-btn{width:28px;height:28px;background:var(--surface2);border:none;color:var(--text);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.12s;font-family:var(--mono);}
+.qty-btn:hover{background:var(--border2);color:var(--accent);}
+.qty-num{min-width:32px;text-align:center;font-size:13px;font-weight:700;background:var(--surface);border-left:1px solid var(--border2);border-right:1px solid var(--border2);line-height:28px;font-family:var(--mono);}
+
+/* NOTES */
+.note{border-radius:8px;padding:9px 13px;font-size:11px;font-family:var(--mono);line-height:1.65;border:1px solid;margin-bottom:8px;}
+.note:last-child{margin-bottom:0;}
+.note.info{background:rgba(0,132,255,0.05);border-color:rgba(0,132,255,0.2);color:var(--accent);}
+.note.success{background:rgba(20,138,82,0.05);border-color:rgba(20,138,82,0.2);color:var(--green);}
+.note.warn{background:rgba(192,92,16,0.06);border-color:rgba(192,92,16,0.25);color:var(--orange);}
+.footnote-box{background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:13px 16px;font-size:11px;font-family:var(--mono);color:var(--muted);line-height:1.7;margin-top:8px;}
+.footnote-box strong{color:var(--text);}
+
+/* ROI */
+.roi-params{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+@media(max-width:700px){.roi-params{grid-template-columns:1fr 1fr;}}
+.roi-param{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;}
+.roi-param label{font-size:10px;font-family:var(--mono);color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.06em;}
+.roi-param input[type=number]{background:transparent;border:none;outline:none;font-family:var(--mono);font-size:16px;font-weight:700;color:var(--text);width:100%;}
+.roi-chart-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px;}
+.roi-chart-title{font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}
+.roi-chart-title .roi-payback{font-size:14px;font-weight:700;color:var(--green);}
+canvas#roi-chart{width:100%;height:280px;display:block;}
+
+/* TWO-COL LAYOUT */
+.two-col{display:grid;grid-template-columns:380px 1fr;gap:18px;align-items:start;}
+@media(max-width:900px){.two-col{grid-template-columns:1fr;}}
+
+footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}
+.footer-brand{font-size:11px;font-family:var(--mono);color:var(--muted);}
+.footer-brand span{color:var(--accent);}
+.footer-spec{font-size:10px;font-family:var(--mono);color:var(--muted);opacity:0.5;}
+.sep{border:none;border-top:1px solid var(--border);margin:8px 0;}
+
+/* LAYOUT MAP */
+.layout-map-wrap{background:#111827;border-radius:14px;padding:16px;overflow-x:auto;}
+.layout-map-title{font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;}
+.layout-map-title strong{color:rgba(255,255,255,0.7);}
+.layout-rows-container{display:flex;flex-direction:column;gap:10px;}
+.layout-row{display:flex;align-items:stretch;gap:4px;}
+.layout-unit{display:flex;flex-direction:column;border-radius:6px;overflow:hidden;min-width:90px;}
+.layout-unit.full-unit{border:2px solid rgba(0,98,204,0.6);}
+.layout-unit.ext-unit{border:2px solid rgba(92,48,200,0.5);}
+.lu-header{padding:3px 6px;font-family:var(--mono);font-size:9px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:space-between;}
+.lu-header.full-h{background:#0062cc;}
+.lu-header.ext-h{background:#5c30c8;}
+.lu-spots{display:flex;gap:3px;padding:5px;background:rgba(255,255,255,0.03);flex:1;}
+.lu-spot{flex:1;min-width:22px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:3px 2px;position:relative;}
+.lu-spot .roof-stripe{position:absolute;top:0;left:0;right:0;height:8px;background:repeating-linear-gradient(90deg,rgba(232,160,16,0.4) 0,rgba(232,160,16,0.4) 5px,rgba(232,160,16,0.1) 5px,rgba(232,160,16,0.1) 6px);border-radius:2px 2px 0 0;}
+.lu-spot .car-e{font-size:12px;margin-top:8px;}
+.lu-spot .sn{font-family:var(--mono);font-size:7px;color:rgba(255,255,255,0.3);margin-top:2px;}
+.layout-row-info{display:flex;flex-direction:column;justify-content:center;padding:0 8px;gap:2px;}
+.lri-label{font-family:var(--mono);font-size:9px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;}
+.lri-val{font-family:var(--mono);font-size:11px;font-weight:700;color:rgba(255,255,255,0.6);}
+
+/* PRINT */
+@media print {
+  body{background:#fff;font-size:11px;}
+  body::before{display:none;}
+  .pdf-btn,.add-carport-row-btn,.del-row-btn,.add-ext-btn,.qty-btn,.cur-btn{display:none!important;}
+  .app{padding:12px;}
+  canvas#roi-chart{height:200px!important;}
+  .cp-row,.layout-map-wrap{break-inside:avoid;}
+  .sec-header{margin:16px 0 8px;}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+<!-- HEADER -->
+<header>
+  <div class="top-bar">
+    <div>
+      <div class="logo-row">
+        <div class="logo-mark">SCP<br>21</div>
+        <div>
+          <h1>Solar<span>Port</span> SCP21</h1>
+          <div class="subtitle">// on-grid solar carport · cost & roi simulator · v2.0</div>
+        </div>
+      </div>
+      <div class="badges">
+        <div class="badge grid">On-Grid Connected</div>
+        <div class="badge info">21 modules / 3 cars per unit</div>
+        <div class="badge info">Snow load: 0.5 kN/m²</div>
+        <div class="badge info">Innoventum.se</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-end;">
+      <div class="currency-row">
+        <span class="cur-label">Currency:</span>
+        <button class="cur-btn active" onclick="setCurrency('EUR')">EUR €</button>
+        <button class="cur-btn" onclick="setCurrency('SEK')">SEK kr</button>
+        <button class="cur-btn" onclick="setCurrency('CHF')">CHF Fr</button>
+      </div>
+      <button class="pdf-btn" onclick="window.print()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Download PDF
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- SECTION 1 -->
+<div class="sec-header">
+  <div class="num">1</div>
+  <h2>Carport Configuration</h2>
+  <span class="sec-sub">— each row = 1 FULL SCP21 + extensions to the right</span>
+</div>
+
+<div class="panel">
+  <div class="panel-head"><div class="dot" style="background:var(--accent)"></div>Carport rows — 1 full SCP21 per row, add extensions freely</div>
+  <div class="panel-body">
+    <div class="row-list" id="row-list"></div>
+    <button class="add-carport-row-btn" onclick="addCarportRow()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add carport row
+    </button>
+    <div style="margin-top:14px;">
+      <div id="total-summary-line" style="font-family:var(--mono);font-size:12px;color:var(--muted);"></div>
+    </div>
+  </div>
+</div>
+
+<div class="two-col">
+  <div>
+    <div class="panel">
+      <div class="panel-head"><div class="dot" style="background:var(--purple)"></div>Installation &amp; delivery cost</div>
+      <div class="panel-body">
+        <p style="font-size:11px;font-family:var(--mono);color:var(--muted);line-height:1.7;margin-bottom:12px;">
+          Included per unit: delivery, assembly, ground screw foundation, waterproof rails, solar modules, DC connection.
+        </p>
+        <div class="editable-field">
+          <label>Install cost / unit</label>
+          <input type="number" id="install-cost-input" value="4000" min="0" step="100" oninput="calc()">
+          <span class="ef-unit" id="ef-unit-install">€ / unit</span>
+        </div>
+        <div style="font-size:10px;font-family:var(--mono);color:var(--muted);margin-top:8px;line-height:1.6;">
+          Volume discount applies equally to hardware + installation.
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div class="dot" style="background:var(--solar)"></div>Solar yield estimation</div>
+      <div class="panel-body">
+        <div class="ctrl">
+          <div class="ctrl-label">
+            <span class="ctrl-name">Annual yield factor</span>
+            <span><span class="ctrl-val solar" id="v-yield">1000</span><span class="ctrl-unit">kWh / kWp</span></span>
+          </div>
+          <input type="range" class="solar" id="sl-yield" min="700" max="1600" step="50" value="1000"
+            oninput="state.yield_factor=+this.value; document.getElementById('v-yield').textContent=this.value; calc()">
+          <div class="range-hints"><span class="range-hint">700 (Nordic winter)</span><span class="range-hint">1600 (South EU)</span></div>
+        </div>
+        <div style="font-size:10px;font-family:var(--mono);color:var(--muted);margin-top:6px;line-height:1.65;">
+          Malmö ~950 · Stockholm ~900 · Zürich ~1100 · Barcelona ~1500
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <div class="panel-head"><div class="dot" style="background:var(--green)"></div>System summary</div>
+      <div class="panel-body">
+        <div class="kpi-row cols-2 mb0" id="system-kpis"></div>
+        <div id="discount-info" style="margin:10px 0;"></div>
+        <div id="cost-bar-wrap"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:0;">
+  <div class="panel-head"><div class="dot" style="background:var(--accent)"></div>Cost breakdown</div>
+  <div class="panel-body" style="padding:0;">
+    <table class="summary-table" id="cost-summary-table"></table>
+  </div>
+</div>
+
+<!-- SECTION 2: EV -->
+<div class="sec-header">
+  <div class="num">2</div>
+  <h2>EV Charging Points</h2>
+  <span class="sec-sub">— optional, 1 to max available parking spaces</span>
+</div>
+
+<div class="two-col">
+  <div class="panel">
+    <div class="panel-head"><div class="dot" style="background:var(--accent)"></div>Charger selection</div>
+    <div class="panel-body">
+      <div class="ev-charger-grid">
+        <div>
+          <div style="font-size:10px;font-family:var(--mono);color:var(--muted);margin-bottom:7px;text-transform:uppercase;letter-spacing:0.07em;">AC 11 kW chargers</div>
+          <div class="qty-ctrl">
+            <button class="qty-btn" onclick="adjEV('n11',-1)">−</button>
+            <div class="qty-num" id="v-n11">0</div>
+            <button class="qty-btn" onclick="adjEV('n11',+1)">+</button>
+          </div>
+          <div style="font-size:10px;font-family:var(--mono);color:var(--muted);margin-top:6px;" id="sub-n11"></div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-family:var(--mono);color:var(--muted);margin-bottom:7px;text-transform:uppercase;letter-spacing:0.07em;">AC 22 kW chargers</div>
+          <div class="qty-ctrl">
+            <button class="qty-btn" onclick="adjEV('n22',-1)">−</button>
+            <div class="qty-num" id="v-n22">0</div>
+            <button class="qty-btn" onclick="adjEV('n22',+1)">+</button>
+          </div>
+          <div style="font-size:10px;font-family:var(--mono);color:var(--muted);margin-top:6px;" id="sub-n22"></div>
+        </div>
+      </div>
+      <div style="height:1px;background:var(--border);margin:14px 0;"></div>
+      <div class="kpi-row cols-2 mb0" id="ev-kpis"></div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div class="dot" style="background:var(--green)"></div>EV system overview</div>
+    <div class="panel-body">
+      <div class="kpi-row cols-2 mb0" id="ev-overview-kpis" style="grid-template-columns:1fr 1fr;"></div>
+      <div id="ev-notes" style="margin-top:10px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 3: ROI -->
+<div class="sec-header">
+  <div class="num">3</div>
+  <h2>Return on Investment</h2>
+  <span class="sec-sub">— break-even &amp; cumulative cash flow over 25 years</span>
+</div>
+
+<div class="two-col">
+  <div>
+    <div class="panel">
+      <div class="panel-head"><div class="dot" style="background:var(--green)"></div>ROI parameters</div>
+      <div class="panel-body">
+        <div class="roi-params" id="roi-params-grid"></div>
+        <div style="font-size:10px;font-family:var(--mono);color:var(--muted);margin-top:12px;line-height:1.65;border-top:1px solid var(--border);padding-top:10px;" id="roi-logic-note"></div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:14px;">
+      <div class="panel-head"><div class="dot" style="background:var(--solar)"></div>Annual revenue &amp; cost estimate</div>
+      <div class="panel-body">
+        <div class="kpi-row cols-2 mb0" id="roi-annual-kpis"></div>
+      </div>
+    </div>
+  </div>
+  <div class="roi-chart-wrap">
+    <div class="roi-chart-title">
+      <span>Cumulative cash flow — 25-year projection</span>
+      <span class="roi-payback" id="payback-label">Payback: —</span>
+    </div>
+    <canvas id="roi-chart"></canvas>
+    <div id="roi-summary-kpis" style="margin-top:14px;"></div>
+  </div>
+</div>
+
+<div class="footnote-box" style="margin-top:20px;">
+  <strong>⚠ Disclaimer:</strong> This simulation is provided for estimation purposes only. All figures are based on the input parameters and standard assumptions. Each project requires individual technical validation, site survey, and detailed engineering design. Prices are exclusive of VAT and may vary based on local conditions, logistics, and volume agreements. <strong>This document does not constitute a formal quotation or commitment to supply.</strong> External costs not included: design validation, building permit, electrical works (cable trenching, AC grid connection, metering installation, inverter). Contact <strong>Innoventum.se</strong> for a project-specific quotation.
+</div>
+
+<footer>
+  <div class="footer-brand">SCP21 On-Grid Simulator — <span>Innoventum.se</span></div>
+  <div class="footer-spec">SCP21 · 21 modules · 3 cars/unit · On-grid · v2.0</div>
+</footer>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+//  CONSTANTS
+// ══════════════════════════════════════════════
+const MODULES_PER_UNIT = 21;
+const CARS_PER_UNIT    = 3;
+const WP_PER_MODULE    = 445;
+const KWP_PER_UNIT     = (MODULES_PER_UNIT * WP_PER_MODULE) / 1000; // 9.345
+const SCREWS_PER_UNIT  = { full: 4, ext: 3 };
+
+const PRICE_FULL_EUR    = 20000;  // Full SCP21
+const PRICE_EXT_EUR     = 17000;  // Extension
+const PRICE_INSTALL_EUR = 5000;
+const PRICE_EV11_EUR    = 1200;
+const PRICE_EV22_EUR    = 1400;
+
+const FX  = { EUR:1, SEK:11.5, CHF:0.97 };
+const SYM = { EUR:'€', SEK:'kr', CHF:'Fr' };
+
+// ══════════════════════════════════════════════
+//  CURRENCY
+// ══════════════════════════════════════════════
+let currency = 'EUR';
+function setCurrency(c) {
+  currency = c;
+  document.querySelectorAll('.cur-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.cur-btn[onclick="setCurrency('${c}')"]`).classList.add('active');
+  document.getElementById('ef-unit-install').textContent = SYM[c] + ' / unit';
+  calc();
+}
+const toC  = v => v * FX[currency];
+const fmt  = (v,d=0) => { const n = d===0?Math.round(toC(v)):parseFloat(toC(v).toFixed(d)); return n.toLocaleString('sv-SE',{maximumFractionDigits:d}); };
+const fmtC = (v,d=0) => SYM[currency]+'\u202f'+fmt(v,d);
+
+// ══════════════════════════════════════════════
+//  DISCOUNT
+// ══════════════════════════════════════════════
+function discountRate(n) {
+  if (n<=2)  return 0;
+  if (n<=5)  return 0.05;
+  if (n<=10) return 0.08;
+  if (n<=20) return 0.10;
+  return 0.13;
+}
+function discountLabel(n) {
+  if (n<=2)  return '1–2 units: no discount';
+  if (n<=5)  return '3–5 units: 5%';
+  if (n<=10) return '6–10 units: 8%';
+  if (n<=20) return '11–20 units: 10%';
+  return '21+ units: 13%';
+}
+
+// ══════════════════════════════════════════════
+//  DATA MODEL
+//  carportRows: array of { id, units: [{type:'full'|'ext'}] }
+//  Each row always starts with exactly 1 full unit
+// ══════════════════════════════════════════════
+let rowIdCtr = 0;
+let carportRows = [];
+
+function newRow() {
+  return { id: ++rowIdCtr, units: [{ type:'full' }] };
+}
+
+function addCarportRow() {
+  carportRows.push(newRow());
+  renderRows();
+  calc();
+}
+
+function removeCarportRow(rowId) {
+  if (carportRows.length <= 1) return;
+  carportRows = carportRows.filter(r => r.id !== rowId);
+  renderRows();
+  calc();
+}
+
+function addExtension(rowId) {
+  const row = carportRows.find(r => r.id === rowId);
+  if (row) { row.units.push({ type:'ext' }); renderRows(); calc(); }
+}
+
+function removeLastExt(rowId) {
+  const row = carportRows.find(r => r.id === rowId);
+  if (row && row.units.length > 1) { row.units.pop(); renderRows(); calc(); }
+}
+
+// ══════════════════════════════════════════════
+//  RENDER ROW LIST (dark themed, like screenshot)
+// ══════════════════════════════════════════════
+function renderRows() {
+  const container = document.getElementById('row-list');
+  let globalSpotCounter = 1;
+
+  container.innerHTML = carportRows.map((row, ri) => {
+    const exts  = row.units.filter(u => u.type==='ext').length;
+    const totalCarsRow = row.units.length * CARS_PER_UNIT;
+    const totalModRow  = row.units.length * MODULES_PER_UNIT;
+    const totalScrews  = row.units.reduce((s,u) => s + (u.type==='full' ? SCREWS_PER_UNIT.full : SCREWS_PER_UNIT.ext), 0);
+    const kwpRow       = row.units.length * KWP_PER_UNIT;
+
+    // Build unit blocks
+    let unitHTML = '';
+    row.units.forEach((u, ui) => {
+      const spots = [];
+      for (let s=0; s<CARS_PER_UNIT; s++) {
+        spots.push(`
+          <div class="parking-spot">
+            <div class="solar-roof"></div>
+            <div class="car-icon">🚗</div>
+            <div class="spot-num">${globalSpotCounter + ui * CARS_PER_UNIT + s}</div>
+          </div>`);
+      }
+      const screws = u.type==='full' ? 4 : 3;
+      const screwDots = Array(screws).fill('<div class="screw"></div>').join('');
+
+      unitHTML += `
+        <div class="unit-block">
+          <div class="unit-tag ${u.type==='full'?'full-tag':'ext-tag'}">
+            <span class="tag-label">${u.type==='full'?'FULL':'EXT'}</span>
+            <span class="tag-cars">SCP21 (3🚗)</span>
+          </div>
+          <div class="unit-visual">
+            <div class="parking-strip">${spots.join('')}</div>
+          </div>
+        </div>`;
+    });
+    globalSpotCounter += totalCarsRow;
+
+    return `
+    <div class="cp-row" id="cprow-${row.id}">
+      <div class="cp-row-header">
+        <div class="cp-row-label">ROW ${ri+1}</div>
+        <span class="cp-row-meta">${totalCarsRow} cars · ${(kwpRow).toFixed(2)} kWp</span>
+        <div class="cp-row-add">
+          <span class="add-ext-label">+ Add extension:</span>
+          <button class="add-ext-btn scp21" onclick="addExtension(${row.id})">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            SCP21 ext (3 cars)
+          </button>
+          ${row.units.length > 1 ? `<button class="add-ext-btn rem" onclick="removeLastExt(${row.id})">− Remove last</button>` : ''}
+          ${carportRows.length > 1 ? `<button class="del-row-btn" onclick="removeCarportRow(${row.id})">× Row</button>` : ''}
+        </div>
+      </div>
+      <div class="cp-row-units">${unitHTML}</div>
+      <div class="cp-row-footer">
+        <span>(1 FULL + ${exts}×EXT)</span>
+        <span>${totalModRow} modules · ${kwpRow.toFixed(2)} kWp</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════
+//  RENDER TOP-VIEW LAYOUT MAP
+// ══════════════════════════════════════════════
+function renderLayoutMap() {
+  const wrap = document.getElementById('layout-map');
+  let spotNum = 1;
+  const totalUnitsAll = carportRows.reduce((s,r) => s+r.units.length, 0);
+  const totalKwp = totalUnitsAll * KWP_PER_UNIT;
+
+  let rowsHTML = carportRows.map((row, ri) => {
+    const unitsHTML = row.units.map(u => {
+      const spotsHTML = Array(CARS_PER_UNIT).fill(0).map(() => {
+        const sn = spotNum++;
+        return `<div class="lu-spot">
+          <div class="roof-stripe"></div>
+          <div class="car-e">🚗</div>
+          <div class="sn">${sn}</div>
+        </div>`;
+      }).join('');
+      return `<div class="layout-unit ${u.type==='full'?'full-unit':'ext-unit'}">
+        <div class="lu-header ${u.type==='full'?'full-h':'ext-h'}">
+          <span>${u.type==='full'?'FULL':'EXT'}</span>
+          <span style="opacity:0.7">3🚗</span>
+        </div>
+        <div class="lu-spots">${spotsHTML}</div>
+      </div>`;
+    }).join('');
+
+    const rowCars = row.units.length * CARS_PER_UNIT;
+    return `<div class="layout-row">
+      ${unitsHTML}
+      <div class="layout-row-info">
+        <span class="lri-label">Row ${ri+1}</span>
+        <span class="lri-val">${rowCars} 🚗</span>
+        <span class="lri-label" style="margin-top:4px;">${(row.units.length*KWP_PER_UNIT).toFixed(1)} kWp</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  const totalCars = carportRows.reduce((s,r) => s + r.units.length*CARS_PER_UNIT, 0);
+
+  wrap.innerHTML = `
+    <div class="layout-map-title">
+      <span>Parking top view — <strong>${totalCars} spaces · ${totalKwp.toFixed(2)} kWp total</strong></span>
+      <span style="font-size:9px;">☀ = solar roof &nbsp; 🚗 = parking spot</span>
+    </div>
+    <div class="layout-rows-container">${rowsHTML}</div>`;
+}
+
+// ══════════════════════════════════════════════
+//  EV STATE
+// ══════════════════════════════════════════════
+const evState = { n11:0, n22:0 };
+function adjEV(key, d) {
+  const maxCars = carportRows.reduce((s,r) => s + r.units.length*CARS_PER_UNIT, 0);
+  evState[key] = Math.max(0, Math.min(maxCars, evState[key]+d));
+  calc();
+}
+
+// ══════════════════════════════════════════════
+//  MAIN STATE
+// ══════════════════════════════════════════════
+const state = {
+  yield_factor: 1000,
+  grid_sell_price: 0.20,
+  grid_buy_price:  0.20,
+  ev_charge_price: 0.50,
+  utilisation:     0.80,
+  solar_self_use:  0.80,
+  opex_annual:     500,
+};
+
+// ══════════════════════════════════════════════
+//  MAIN CALC
+// ══════════════════════════════════════════════
+function calc() {
+  const installCost = parseFloat(document.getElementById('install-cost-input').value) || 4000;
+
+  // Aggregate
+  let totalUnits=0, totalFullUnits=0, totalExtUnits=0, totalHwCost=0;
+  carportRows.forEach(row => {
+    row.units.forEach(u => {
+      totalUnits++;
+      if (u.type==='full') { totalFullUnits++; totalHwCost += PRICE_FULL_EUR; }
+      else                  { totalExtUnits++;  totalHwCost += PRICE_EXT_EUR;  }
+    });
+  });
+  const totalCarsN   = totalUnits * CARS_PER_UNIT;
+  const totalModules = totalUnits * MODULES_PER_UNIT;
+  const totalKwp     = totalUnits * KWP_PER_UNIT;
+  const annualKwh    = totalKwp * state.yield_factor;
+
+  const discRate      = discountRate(totalUnits);
+  const totalInstall  = totalUnits * installCost;
+  const grossCarport  = totalHwCost + totalInstall;
+  const discAmount    = grossCarport * discRate;
+  const netCarport    = grossCarport - discAmount;
+
+  const nEV       = evState.n11 + evState.n22;
+  const evHwCost  = evState.n11 * PRICE_EV11_EUR + evState.n22 * PRICE_EV22_EUR;
+  const finalTotal = netCarport + evHwCost;
+
+  // Clamp EV
+  evState.n11 = Math.min(evState.n11, totalCarsN);
+  evState.n22 = Math.min(evState.n22, totalCarsN - evState.n11);
+  document.getElementById('v-n11').textContent = evState.n11;
+  document.getElementById('v-n22').textContent = evState.n22;
+  document.getElementById('sub-n11').textContent = `${fmtC(PRICE_EV11_EUR)} /unit incl. install`;
+  document.getElementById('sub-n22').textContent = `${fmtC(PRICE_EV22_EUR)} /unit incl. install`;
+
+  document.getElementById('total-summary-line').innerHTML =
+    `<span style="color:var(--accent);font-weight:700;">SCP21:</span> ${totalFullUnits}F + ${totalExtUnits}E = ${totalCarsN} cars`;
+
+  // System KPIs
+  document.getElementById('system-kpis').innerHTML = `
+    <div class="kpi hl"><div class="kpi-label">Total parking spaces</div><div class="kpi-val blue">${totalCarsN}</div><div class="kpi-sub">${totalUnits} units (${totalFullUnits}F+${totalExtUnits}E)</div></div>
+    <div class="kpi hl"><div class="kpi-label">Total solar capacity</div><div class="kpi-val solar">${totalKwp.toFixed(2)}<span style="font-size:11px"> kWp</span></div><div class="kpi-sub">${totalModules} × ${WP_PER_MODULE} Wp</div></div>
+    <div class="kpi hl"><div class="kpi-label">Est. annual yield</div><div class="kpi-val green">${Math.round(annualKwh).toLocaleString('sv-SE')}<span style="font-size:10px"> kWh</span></div><div class="kpi-sub">${state.yield_factor} kWh/kWp</div></div>
+    <div class="kpi hl"><div class="kpi-label">Discount tier</div><div class="kpi-val ${discRate>0?'green':''}">${discRate>0?'−'+Math.round(discRate*100)+'%':'None'}</div><div class="kpi-sub">${discountLabel(totalUnits)}</div></div>`;
+
+  // Discount badge
+  document.getElementById('discount-info').innerHTML = discRate > 0
+    ? `<div class="disc-badge">✓ Volume discount −${Math.round(discRate*100)}% applied — saving ${fmtC(discAmount)}</div>`
+    : `<span style="font-size:10px;font-family:var(--mono);color:var(--muted);">No volume discount at 1–2 units.</span>`;
+
+  // Cost bar
+  const hwPct = grossCarport>0 ? (totalHwCost/grossCarport)*100 : 0;
+  const inPct = grossCarport>0 ? (totalInstall/grossCarport)*100 : 0;
+  document.getElementById('cost-bar-wrap').innerHTML = `
+    <div class="cost-bar-title">Hardware vs installation split (pre-discount)</div>
+    <div class="cost-bar-track">
+      <div style="width:${hwPct}%;background:var(--accent)"><span>${hwPct>15?'Hardware '+Math.round(hwPct)+'%':''}</span></div>
+      <div style="width:${inPct}%;background:var(--purple)"><span>${inPct>10?'Install '+Math.round(inPct)+'%':''}</span></div>
+    </div>
+    <div class="cost-legend">
+      <div class="leg-item"><div class="leg-dot" style="background:var(--accent)"></div>Hardware ${fmtC(totalHwCost)}</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--purple)"></div>Installation ${fmtC(totalInstall)}</div>
+      ${discRate>0?`<div class="leg-item"><div class="leg-dot" style="background:var(--green)"></div>Discount −${fmtC(discAmount)}</div>`:''}
+    </div>`;
+
+  // Cost table
+  let tableRows = `
+    <thead><tr>
+      <th>Item</th><th>Qty</th><th>Unit price</th><th>Subtotal</th>
+    </tr></thead><tbody>
+    <tr><td><span class="row-type-badge full">SCP21 Full</span> Base solar carport</td><td>${totalFullUnits}</td><td>${fmtC(PRICE_FULL_EUR)}</td><td style="font-weight:600">${fmtC(totalFullUnits*PRICE_FULL_EUR)}</td></tr>`;
+  if (totalExtUnits>0) tableRows += `<tr><td><span class="row-type-badge ext">SCP21 Ext</span> Extension unit</td><td>${totalExtUnits}</td><td>${fmtC(PRICE_EXT_EUR)}</td><td style="font-weight:600">${fmtC(totalExtUnits*PRICE_EXT_EUR)}</td></tr>`;
+  tableRows += `<tr><td>Installation &amp; delivery (per unit)</td><td>${totalUnits}</td><td>${fmtC(installCost)}</td><td style="font-weight:600">${fmtC(totalInstall)}</td></tr>`;
+  if (nEV>0) tableRows += `<tr><td>EV chargers (11kW×${evState.n11} + 22kW×${evState.n22})</td><td>${nEV}</td><td>—</td><td style="font-weight:600">${fmtC(evHwCost)}</td></tr>`;
+  tableRows += `<tr class="subtotal"><td colspan="3">Gross total (pre-discount)</td><td>${fmtC(grossCarport+evHwCost)}</td></tr>`;
+  if (discRate>0) tableRows += `<tr class="discount"><td colspan="3">Volume discount −${Math.round(discRate*100)}%</td><td>−${fmtC(discAmount)}</td></tr>`;
+  tableRows += `<tr class="total"><td colspan="3">ESTIMATED TOTAL (excl. VAT)</td><td>${fmtC(finalTotal)}</td></tr>`;
+  tableRows += `</tbody>`;
+  document.getElementById('cost-summary-table').innerHTML = tableRows;
+
+  // EV KPIs
+  document.getElementById('ev-kpis').innerHTML = `
+    <div class="kpi"><div class="kpi-label">11 kW chargers</div><div class="kpi-val blue">${evState.n11}</div><div class="kpi-sub">${fmtC(evState.n11*PRICE_EV11_EUR)}</div></div>
+    <div class="kpi"><div class="kpi-label">22 kW chargers</div><div class="kpi-val blue">${evState.n22}</div><div class="kpi-sub">${fmtC(evState.n22*PRICE_EV22_EUR)}</div></div>`;
+
+  const evPower = evState.n11*11 + evState.n22*22;
+  // Fuse size: total EV kW × 1000 → W, ÷ 230V ÷ 3 phases
+  const fuseAmps = nEV > 0 ? (evPower * 1000) / (230 * 3) : 0;
+  // Round up to nearest standard fuse size
+  const stdFuses = [16,20,25,32,40,50,63,80,100,125,160,200,250,315,400];
+  const recFuse  = stdFuses.find(f => f >= fuseAmps) || Math.ceil(fuseAmps);
+
+  document.getElementById('ev-overview-kpis').innerHTML = `
+    <div class="kpi hl"><div class="kpi-label">EV charger cost</div><div class="kpi-val purple">${fmtC(evHwCost)}</div><div class="kpi-sub">${nEV} unit${nEV!==1?'s':''} total</div></div>
+    <div class="kpi hl"><div class="kpi-label">Total EV power</div><div class="kpi-val blue">${evPower}<span style="font-size:10px"> kW</span></div><div class="kpi-sub">${evState.n11}×11 + ${evState.n22}×22</div></div>
+    <div class="kpi hl"><div class="kpi-label">Spaces with charger</div><div class="kpi-val green">${nEV} / ${totalCarsN}</div><div class="kpi-sub">${totalCarsN-nEV} unequipped</div></div>
+    <div class="kpi hl"><div class="kpi-label">Coverage</div><div class="kpi-val ${totalCarsN>0&&nEV/totalCarsN>=0.5?'green':'solar'}">${totalCarsN>0?Math.round(nEV/totalCarsN*100):0}%</div><div class="kpi-sub">of spaces</div></div>
+    ${nEV>0?`
+    <div class="kpi hl" style="grid-column:1/-1;border-color:rgba(0,98,204,0.25);background:rgba(0,98,204,0.04);">
+      <div class="kpi-label">Recommended grid fuse (per phase) — 3Φ 230V AC</div>
+      <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-top:2px;">
+        <div><div class="kpi-val blue">${recFuse}<span style="font-size:11px"> A</span></div><div class="kpi-sub">recommended std. fuse / phase</div></div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.7;">
+          ${evPower} kW × 1000 = ${evPower*1000} W &nbsp;÷&nbsp; 230V &nbsp;÷&nbsp; 3 phases = <strong style="color:var(--text)">${fuseAmps.toFixed(1)} A</strong> → next std. size: <strong style="color:var(--accent)">${recFuse} A</strong>
+        </div>
+      </div>
+    </div>`:''}`;
+
+
+  let evNotes = '';
+  if (nEV===0) evNotes+=`<div class="note info">ℹ No EV chargers — solar production exported to grid.</div>`;
+  if (nEV>0 && evPower > totalKwp*2) evNotes+=`<div class="note warn">⚡ EV peak (${evPower} kW) > 2× solar peak (${(totalKwp*2).toFixed(1)} kW). Grid will cover significant EV demand.</div>`;
+  if (nEV>0) evNotes+=`<div class="note success">☀ Solar self-use reduces grid buy-in and improves ROI.</div>`;
+  document.getElementById('ev-notes').innerHTML = evNotes;
+
+  // ROI
+  buildROIParams();
+  calcROI(annualKwh, nEV, evPower, finalTotal, totalCarsN);
+}
+
+// ══════════════════════════════════════════════
+//  ROI PARAMS (lazy init)
+// ══════════════════════════════════════════════
+const ROI_FIELDS = [
+  { key:'grid_sell_price', label:'Grid sell price',  unit:'/kWh', step:0.01 },
+  { key:'grid_buy_price',  label:'Grid buy price',   unit:'/kWh', step:0.01 },
+  { key:'ev_charge_price', label:'EV charge price',  unit:'/kWh', step:0.01 },
+  { key:'utilisation',     label:'EV utilisation',   unit:'(0-1)', step:0.05 },
+  { key:'solar_self_use',  label:'Solar self-use',   unit:'(0-1)', step:0.05 },
+  { key:'opex_annual',     label:'Annual O&M cost',  unit:'/yr',   step:100 },
+];
+let roiParamsBuilt = false;
+function buildROIParams() {
+  if (roiParamsBuilt) return;
+  roiParamsBuilt = true;
+  document.getElementById('roi-params-grid').innerHTML = ROI_FIELDS.map(f => `
+    <div class="roi-param">
+      <label>${f.label} <span style="opacity:0.6">(${SYM[currency]}${f.unit})</span></label>
+      <input type="number" id="roi-${f.key}" value="${state[f.key]}" step="${f.step}"
+        oninput="state['${f.key}']=+this.value; calcROIOnly()">
+    </div>`).join('');
+}
+
+function calcROIOnly() {
+  const annualKwh = carportRows.reduce((s,r)=>s+r.units.length,0) * KWP_PER_UNIT * state.yield_factor;
+  const nEV = evState.n11 + evState.n22;
+  const evPower = evState.n11*11 + evState.n22*22;
+  const installCost = parseFloat(document.getElementById('install-cost-input').value)||5000;
+  let totalUnits=0, hw=0;
+  carportRows.forEach(r=>r.units.forEach(u=>{totalUnits++;hw+=u.type==='full'?PRICE_FULL_EUR:PRICE_EXT_EUR;}));
+  const disc = discountRate(totalUnits);
+  const gross = hw + totalUnits*installCost;
+  const net = gross*(1-disc) + evState.n11*PRICE_EV11_EUR + evState.n22*PRICE_EV22_EUR;
+  const totalCarsN = totalUnits*CARS_PER_UNIT;
+  calcROI(annualKwh, nEV, evPower, net, totalCarsN);
+}
+
+function calcROI(annualKwh, nEV, evPower, investmentEUR, totalCars) {
+  const hasEV = nEV > 0;
+  const evAnnualDemand = nEV * 15 * state.utilisation * 365;
+  const solarSelfUse   = annualKwh * state.solar_self_use;
+  const solarExported  = annualKwh * (1 - state.solar_self_use);
+
+  let rev_ev_solar=0, rev_ev_grid=0, cost_grid_buy=0, rev_export=0;
+  if (hasEV) {
+    const solarToEV   = Math.min(solarSelfUse, evAnnualDemand);
+    const gridToEV    = Math.max(0, evAnnualDemand - solarToEV);
+    rev_ev_solar  = solarToEV  * state.ev_charge_price;
+    cost_grid_buy = gridToEV   * state.grid_buy_price;
+    rev_ev_grid   = gridToEV   * state.ev_charge_price;
+    rev_export    = (Math.max(0, solarSelfUse-solarToEV) + solarExported) * state.grid_sell_price;
+  } else {
+    rev_export = annualKwh * state.grid_sell_price;
+  }
+  const annualRevenue = rev_ev_solar + rev_ev_grid + rev_export;
+  const annualCost    = cost_grid_buy + state.opex_annual;
+  const annualNet     = annualRevenue - annualCost;
+
+  document.getElementById('roi-logic-note').innerHTML = hasEV
+    ? `Solar → EV first at ${SYM[currency]}${fmt(state.ev_charge_price,2)}/kWh. Grid tops up at ${SYM[currency]}${fmt(state.grid_buy_price,2)}/kWh cost → sold at ${SYM[currency]}${fmt(state.ev_charge_price,2)}/kWh. Surplus exported at ${SYM[currency]}${fmt(state.grid_sell_price,2)}/kWh.`
+    : `No EV — all solar (${Math.round(annualKwh).toLocaleString()} kWh/yr) exported at ${SYM[currency]}${fmt(state.grid_sell_price,2)}/kWh.`;
+
+  document.getElementById('roi-annual-kpis').innerHTML = `
+    <div class="kpi hl"><div class="kpi-label">Annual revenue</div><div class="kpi-val solar">${fmtC(annualRevenue)}</div><div class="kpi-sub">export + EV charging</div></div>
+    <div class="kpi hl"><div class="kpi-label">Annual costs</div><div class="kpi-val red">${fmtC(annualCost)}</div><div class="kpi-sub">grid buy-in + O&M</div></div>
+    <div class="kpi hl"><div class="kpi-label">Net annual income</div><div class="kpi-val ${annualNet>0?'green':'red'}">${fmtC(annualNet)}</div><div class="kpi-sub">revenue − costs</div></div>
+    <div class="kpi hl"><div class="kpi-label">CO₂ offset / yr</div><div class="kpi-val green">${(annualKwh*0.1/1000).toFixed(2)}<span style="font-size:10px"> t</span></div><div class="kpi-sub">~100g CO₂/kWh</div></div>`;
+
+  const years = [];
+  let cum = -investmentEUR;
+  let payback = null;
+  for (let y=0; y<=25; y++) {
+    if (y>0) cum += annualNet;
+    years.push({y, cum});
+    if (!payback && cum>=0 && y>0) payback = y;
+  }
+
+  const paybackEst = payback ?? (annualNet>0 ? (investmentEUR/annualNet).toFixed(1) : null);
+  document.getElementById('payback-label').textContent = payback
+    ? `Payback: ~${payback} years`
+    : annualNet<=0 ? 'Payback: not reached' : `Payback: ~${paybackEst} years`;
+
+  const npv25 = cum;
+  const roi25 = investmentEUR>0 ? (npv25/investmentEUR)*100 : 0;
+  document.getElementById('roi-summary-kpis').innerHTML = `
+    <div class="kpi-row cols-3 mb0">
+      <div class="kpi accent"><div class="kpi-label">Total investment</div><div class="kpi-val blue">${fmtC(investmentEUR)}</div><div class="kpi-sub">carport + install + EV</div></div>
+      <div class="kpi accent"><div class="kpi-label">25-yr net cash flow</div><div class="kpi-val ${npv25>0?'green':'red'}">${fmtC(npv25)}</div><div class="kpi-sub">excl. inflation</div></div>
+      <div class="kpi accent"><div class="kpi-label">ROI 25 yrs</div><div class="kpi-val ${roi25>0?'green':'red'}">${Math.round(roi25)}%</div><div class="kpi-sub">${payback?payback+'-yr payback':'adj. params'}</div></div>
+    </div>`;
+
+  drawROIChart(years, investmentEUR);
+}
+
+function drawROIChart(years, inv) {
+  const canvas = document.getElementById('roi-chart');
+  const dpr = window.devicePixelRatio||1;
+  const W = canvas.offsetWidth; const H = canvas.offsetHeight||280;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr,dpr); ctx.clearRect(0,0,W,H);
+  const pad={l:68,r:20,t:20,b:38};
+  const iW=W-pad.l-pad.r, iH=H-pad.t-pad.b;
+  const vals=years.map(y=>y.cum);
+  const minV=Math.min(...vals,-inv*0.05), maxV=Math.max(...vals,0), range=maxV-minV||1;
+  const xOf=y=>pad.l+(y/25)*iW, yOf=v=>pad.t+iH-((v-minV)/range)*iH, y0=yOf(0);
+  // grid
+  ctx.strokeStyle='rgba(0,0,0,0.06)';ctx.lineWidth=1;
+  for(let i=0;i<=5;i++){
+    const y=pad.t+(iH/5)*i;
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+iW,y);ctx.stroke();
+    const v=maxV-(range/5)*i;
+    ctx.fillStyle='#7a8299';ctx.font=`10px DM Mono,monospace`;ctx.textAlign='right';
+    ctx.fillText(fmtC(v,0),pad.l-6,y+4);
+  }
+  ctx.fillStyle='#7a8299';ctx.font=`10px DM Mono,monospace`;ctx.textAlign='center';
+  [0,5,10,15,20,25].forEach(y=>ctx.fillText(`Yr ${y}`,xOf(y),H-pad.b+16));
+  // zero line
+  ctx.strokeStyle='rgba(0,0,0,0.18)';ctx.lineWidth=1.5;ctx.setLineDash([4,3]);
+  ctx.beginPath();ctx.moveTo(pad.l,y0);ctx.lineTo(pad.l+iW,y0);ctx.stroke();
+  ctx.setLineDash([]);
+  // fills
+  ctx.beginPath();ctx.moveTo(xOf(0),y0);years.forEach(p=>ctx.lineTo(xOf(p.y),yOf(p.cum)));ctx.lineTo(xOf(25),y0);ctx.closePath();ctx.fillStyle='rgba(200,40,40,0.08)';ctx.fill();
+  ctx.beginPath();years.forEach((p,i)=>{const x=xOf(p.y),y=yOf(p.cum);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.lineTo(xOf(25),y0);ctx.lineTo(pad.l,y0);ctx.closePath();ctx.fillStyle='rgba(20,138,82,0.10)';ctx.fill();
+  // line
+  ctx.beginPath();ctx.strokeStyle='#0062cc';ctx.lineWidth=2.5;
+  years.forEach((p,i)=>{const x=xOf(p.y),y=yOf(p.cum);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+  ctx.stroke();
+  // payback dot
+  const pb=years.find(p=>p.cum>=0&&p.y>0);
+  if(pb){const px=xOf(pb.y),py=yOf(pb.cum);ctx.beginPath();ctx.arc(px,py,5,0,Math.PI*2);ctx.fillStyle='#148a52';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#148a52';ctx.font=`bold 11px DM Mono,monospace`;ctx.textAlign='center';ctx.fillText(`Yr ${pb.y}`,px,py-10);}
+}
+
+// ══════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════
+carportRows.push(newRow());
+renderRows();
+calc();
+window.addEventListener('resize', calc);
+</script>
+</body>
+</html>
